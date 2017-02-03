@@ -1,0 +1,205 @@
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <style>
+        #available, #unavailable, #invalid, #apiDown {
+            display: none;
+        }
+
+        #availability {
+            text-align: center;
+        }
+
+    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="http://chegg-tutors.appspot.com/public/styles.css" />
+    <title>Chegg Tutors Engineering</title>
+    <link rel="icon" type="image/x-icon" href="http://chegg-tutors.appspot.com/public/img/chegg-favicon.ico" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
+  </head>
+  <body>
+    <div id="chg-balloon-logo-container">
+        <img src="http://chegg-tutors.appspot.com/public/img/logo.png" />
+    </div>
+    <div id="chg-balloon-controls-container">
+        <p>Enter a username to get started!</p>
+        <input id="chg-balloon-input" maxlength="2048" placeholder="e.g. BalloonMaster99"
+            name="username" autocomplete="off" type="text" value="" />
+        <button id="chg-balloon-submit">Check availability</button>
+    </div>
+
+    <div id="availability">
+        <div id="invalid">
+            <img src="http://icons.iconarchive.com/icons/iconicon/alpha-magnets/128/Letter-x-icon.png" height="40"/>
+            <p></p>
+
+        </div>
+
+        <div id="available">
+            <img src="http://findicons.com/files/icons/767/wp_woothemes_ultimate/128/checkmark.png" height="40"/>
+            <p></p> <!-- Placeholder HTML <p> tag-->
+        </div>
+
+        <div id="unavailable">
+            <img src="http://icons.iconarchive.com/icons/iconicon/alpha-magnets/128/Letter-x-icon.png" height="40"/>
+            <p></p>
+            <p></p>
+            <p></p>
+            <p></p> <!-- Placeholder HTML <p> tags-->
+        </div>
+
+        <div id="apiDown">
+            <img src="http://icons.iconarchive.com/icons/iconicon/alpha-magnets/128/Letter-x-icon.png" height="40"/>
+            <p></p>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+
+        var inputName;
+        var adjectives = [];
+
+        // Preload list of adjectives to append to suggested names.
+        // Please disable ad-block so HTTP calls can retrieve external .json file.
+        $.getJSON("https://raw.githubusercontent.com/dariusk/corpora/master/data/words/adjs.json", function(json) {
+                adjectives = json.adjs;
+            });
+
+        /* Tutorial
+        $.ajax("http://chegg-tutors.appspot.com/coding-challenge/api/user/?username=Hillary2016").done(function(data) {
+            // This logs Hillary2016's user data, since the username is registered
+            console.log(JSON.stringify(data));
+          });
+
+        $.ajax("http://chegg-tutors.appspot.com/coding-challenge/api/user/?username=Trump4Pres,FeelTheBern1").done(function(data) {
+            // This logs Trump4Pres's user data, since the username is registered, but
+            // no user data for FeelTheBern1, since that username is not currently registered
+            console.log(JSON.stringify(data));
+          });
+        */
+
+        $("#chg-balloon-submit").click(function() {
+            var username = document.getElementById('chg-balloon-input').value;
+            var available = document.getElementById("available");
+            var unavailable = document.getElementById("unavailable");
+            var invalid = document.getElementById("invalid");
+            var apiDown = document.getElementById("apiDown");
+
+            var specialChars = /[`^~<>,"']/
+            if (specialChars.test(username)) {
+                var textNode = document.createTextNode("Sorry! Special characters are not allowed.");
+                invalid.replaceChild(textNode, invalid.childNodes[2]);
+                available.style.display = "none";
+                unavailable.style.display = "none";
+                apiDown.style.display = "none";
+                invalid.style.display = "inline";
+            } else {
+                $.ajax("http://chegg-tutors.appspot.com/coding-challenge/api/user/?username=" + username)
+                    .done(function(data) {
+
+                        inputName = JSON.stringify(data);
+                        if (inputName == "[]") {
+                            // Name is available.
+                            
+                            var textNode = document.createTextNode("Congrats! " + username + " is available.");
+                            available.replaceChild(textNode, available.childNodes[2]);
+                            unavailable.style.display = "none";
+                            invalid.style.display = "none";
+                            apiDown.style.display = "none";
+                            available.style.display = "inline";
+                        } else {
+                            // Name is not available.
+                            var suggestedNames = [];
+                            (function poll() {
+                                setTimeout(function() {
+                                    var candidateNames = [];
+                                    for (var i = 0; i < 6; i++) {
+                                        // 6 (arbitrary) random names to minimize multiple AJAX calls
+                                        var candidateName = createRandomName(username);
+                                        if (candidateName != null && candidateNames != undefined) {
+                                            candidateNames.push(createRandomName(username));
+                                        }
+                                    }
+                                    
+                                    var intermediate;
+                                    viableCandidateNames(candidateNames).done(function(data) {
+                                        intermediate = data;
+                                        // Extract username from return object.
+                                        for (var i = 0; i < intermediate.length; i++) {
+                                            suggestedNames.push(intermediate[i].username);
+                                        }
+                                    });
+                                    
+                                    if (suggestedNames.length == 0) {
+                                        // None of the suggested names are available.
+                                        poll();
+                                    } else {
+                                        // Modify DOM
+                                        var textNode = document.createTextNode("Sorry! " + username + " is unavailable. How about these names instead?");
+                                        var suggestedNameNode1 = document.createTextNode(suggestedNames[0]);
+                                        var suggestedNameNode2 = document.createTextNode(suggestedNames[1]);
+                                        var suggestedNameNode3 = document.createTextNode(suggestedNames[2]);
+                                        unavailable.replaceChild(textNode, unavailable.childNodes[2]);
+                                        unavailable.replaceChild(suggestedNameNode1, unavailable.childNodes[4]);
+                                        unavailable.replaceChild(suggestedNameNode2, unavailable.childNodes[6]);
+                                        unavailable.replaceChild(suggestedNameNode3, unavailable.childNodes[8]);
+                                        available.style.display = "none";
+                                        invalid.style.display = "none";
+                                        apiDown.style.display = "none";
+                                        unavailable.style.display = "inline";
+                                    }
+                                    
+                                }, 100);
+                            })();
+                            
+                        }
+                    })
+                    .fail(function(data) {
+                        available.style.display = "none";
+                        invalid.style.display = "none";
+                        unavailable.style.display = "none";
+
+                        var textNode = document.createTextNode("Sorry! It seems like our server is down. Please try again later.");
+                        apiDown.replaceChild(textNode, apiDown.childNodes[2]);
+
+                        apiDown.style.display = "inline";
+                    });
+            }
+        });
+
+        function createRandomName(baseName) {
+            var adj = adjectives[Math.floor(Math.random()*adjectives.length)];
+            return adj + baseName.substr(0,1).toUpperCase() + baseName.substr(1, baseName.length);
+        }
+
+        function viableCandidateNames(candidateNames) {
+            // Checks API if collection of names is available.
+            var stringQueries = candidateNames.join();
+            return $.ajax("http://chegg-tutors.appspot.com/coding-challenge/api/user/?username=" + stringQueries).done(function(data) {
+                var viableNames = [];
+                var existingNames = JSON.stringify(data);
+
+                for (var i = 0; i < candidateNames.length; i++) {
+                    if (!existingNames.includes(candidateNames[i])) {
+                        viableNames.push(candidateNames[i]);
+                    }
+                }
+                
+                return viableNames;
+            });
+        }
+
+        // Bind enter key press to simulate clicking button.
+        document.getElementById('chg-balloon-input').onkeypress = function(e){
+            if (!e) e = window.event;
+            if (e.keyCode == '13'){
+              $("#chg-balloon-submit").click();
+              return false;
+            }
+          }
+
+    </script>
+
+  </body>
+</html>
